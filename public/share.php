@@ -4,9 +4,14 @@ require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/layout.php';
 
 $staff = current_staff();
-$docId = (int) ($_GET['doc'] ?? 0);
-$stmt = db()->prepare('SELECT * FROM documents WHERE id = ?');
-$stmt->execute([$docId]);
+$docParam = $_GET['doc'] ?? '';
+if (ctype_digit($docParam)) {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE id = ?');
+    $stmt->execute([(int) $docParam]);
+} else {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE readable_id = ?');
+    $stmt->execute([$docParam]);
+}
 $doc = $stmt->fetch();
 
 if (!$doc) {
@@ -75,9 +80,33 @@ render_header('Share · ' . $doc['title'], $staff);
 
 <?php if ($created_token): ?>
     <div class="banner banner-success">
-        Share link ready:
-        <code>http://<?= h($_SERVER['HTTP_HOST']) ?>/view.php?token=<?= h($created_token) ?></code>
+        <p class="share-links-label">Share link ready — choose which to send:</p>
+        <div class="link-row">
+            <span class="link-label">Token link <span class="label-hint">(private, unguessable — best for sensitive documents)</span></span>
+            <div class="link-url-row">
+                <code id="token-url">http://<?= h($_SERVER['HTTP_HOST']) ?>/view.php?token=<?= h($created_token) ?></code>
+                <button class="btn-copy" onclick="copyLink('token-url', this)">Copy</button>
+            </div>
+        </div>
+        <?php if ($doc['readable_id'] !== null): ?>
+        <div class="link-row">
+            <span class="link-label">Readable link <span class="label-hint">(easy to say, type, or share verbally)</span></span>
+            <div class="link-url-row">
+                <code id="readable-url">http://<?= h($_SERVER['HTTP_HOST']) ?>/view.php?id=<?= h($doc['readable_id']) ?></code>
+                <button class="btn-copy" onclick="copyLink('readable-url', this)">Copy</button>
+            </div>
+        </div>
+        <?php endif ?>
     </div>
+    <script>
+    function copyLink(id, btn) {
+        navigator.clipboard.writeText(document.getElementById(id).textContent.trim())
+            .then(function() {
+                btn.textContent = 'Copied!';
+                setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+            }).catch(function() {});
+    }
+    </script>
 <?php endif ?>
 
 <section class="card">

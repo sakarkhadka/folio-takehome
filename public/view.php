@@ -3,24 +3,34 @@
 require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/layout.php';
 
-$token = $_GET['token'] ?? '';
+$token   = $_GET['token'] ?? '';
+$idParam = $_GET['id']    ?? '';
 
-$stmt = db()->prepare('
-    SELECT d.*, s.recipient_email
-    FROM shares s
-    JOIN documents d ON d.id = s.document_id
-    WHERE s.token = ?
-');
-$stmt->execute([$token]);
-$doc = $stmt->fetch();
+if ($idParam !== '') {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE readable_id = ?');
+    $stmt->execute([$idParam]);
+    $doc = $stmt->fetch();
+    if ($doc) {
+        $doc['recipient_email'] = null;
+    }
+} else {
+    $stmt = db()->prepare('
+        SELECT d.*, s.recipient_email
+        FROM shares s
+        JOIN documents d ON d.id = s.document_id
+        WHERE s.token = ?
+    ');
+    $stmt->execute([$token]);
+    $doc = $stmt->fetch();
+}
 
 if (!$doc) {
     http_response_code(404);
     render_header('Not found');
     ?>
     <div class="centered-message">
-        <h1>Share link not found</h1>
-        <p>The link you used is invalid or has been removed.</p>
+        <h1><?= $idParam !== '' ? 'Document not found' : 'Share link not found' ?></h1>
+        <p><?= $idParam !== '' ? 'No document exists with that ID.' : 'The link you used is invalid or has been removed.' ?></p>
     </div>
     <?php
     render_footer();
@@ -49,7 +59,7 @@ render_header($doc['title']);
 ?>
 
 <h1 class="page-title"><?= h($doc['title']) ?></h1>
-<p class="meta">Shared with <?= h($doc['recipient_email']) ?></p>
+<?php if ($doc['recipient_email']): ?><p class="meta">Shared with <?= h($doc['recipient_email']) ?></p><?php endif ?>
 
 <pre class="doc-body"><?= h($doc['body']) ?></pre>
 

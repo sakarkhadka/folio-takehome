@@ -91,5 +91,36 @@ test('document with null publish_at is immediately available', function () {
     assert_true($row['publish_at'] === null, 'seeded document should have no publish_at restriction');
 });
 
+test('seeded document has a readable_id', function () {
+    $stmt = db()->prepare('SELECT readable_id FROM documents WHERE title = ?');
+    $stmt->execute(['Welcome Packet']);
+    $row = $stmt->fetch();
+    assert_true($row['readable_id'] !== null, 'seeded document should have a readable_id');
+});
+
+test('readable_id matches slug pattern', function () {
+    $stmt = db()->prepare('SELECT readable_id FROM documents WHERE title = ?');
+    $stmt->execute(['Welcome Packet']);
+    $row = $stmt->fetch();
+    assert_true(
+        preg_match('/^[a-z0-9][a-z0-9-]*-[a-z0-9]{4}$/', $row['readable_id']) === 1,
+        'readable_id should match slug-XXXX pattern, got: ' . var_export($row['readable_id'], true)
+    );
+});
+
+test('generate_readable_id produces different values for same title', function () {
+    $id1 = generate_readable_id('Test Document');
+    $id2 = generate_readable_id('Test Document');
+    assert_true($id1 !== $id2, 'two generated readable_ids for same title should differ');
+});
+
+test('generate_readable_id slugifies special characters', function () {
+    $id = generate_readable_id('2024 Benefits & Onboarding Guide!');
+    assert_true(
+        preg_match('/^[a-z0-9][a-z0-9-]*-[a-z0-9]{4}$/', $id) === 1,
+        'readable_id with special chars should match slug pattern, got: ' . var_export($id, true)
+    );
+});
+
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);

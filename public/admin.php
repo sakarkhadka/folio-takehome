@@ -33,7 +33,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$title, $body, $staff['id'], $publishAt]);
             $docId = (int) db()->lastInsertId();
 
-            audit_log('create', 'document', $docId, ['title' => $title, 'publish_at' => $publishAt]);
+            $readableId = null;
+            for ($i = 0; $i < 3; $i++) {
+                $candidate = generate_readable_id($title);
+                try {
+                    db()->prepare('UPDATE documents SET readable_id = ? WHERE id = ?')
+                        ->execute([$candidate, $docId]);
+                    $readableId = $candidate;
+                    break;
+                } catch (PDOException $e) {
+                    if (strpos($e->getMessage(), 'UNIQUE') !== false) continue;
+                    throw $e;
+                }
+            }
+            if ($readableId === null) {
+                $slug = trim(substr(preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), 0, 40), '-');
+                $readableId = $slug . '-' . $docId;
+                db()->prepare('UPDATE documents SET readable_id = ? WHERE id = ?')
+                    ->execute([$readableId, $docId]);
+            }
+
+            audit_log('create', 'document', $docId, [
+                'title'       => $title,
+                'publish_at'  => $publishAt,
+                'readable_id' => $readableId,
+            ]);
 
             header('Location: /admin.php?created=' . $docId);
             exit;
@@ -113,6 +137,7 @@ render_header('Admin', $staff);
                     <th>Title</th>
                     <th>Creator</th>
                     <th>Created</th>
+                    <th>Readable ID</th>
                     <th>Status</th>
                     <th></th>
                 </tr>
@@ -124,6 +149,7 @@ render_header('Admin', $staff);
                         <td><?= h($d['title']) ?></td>
                         <td><?= h($d['creator_name']) ?></td>
                         <td><?= h($d['created_at']) ?></td>
+                        <td class="readable-id"><?= $d['readable_id'] !== null ? h($d['readable_id']) : '<span class="text-muted">—</span>' ?></td>
                         <td><?php
                             if ($d['publish_at'] !== null && new DateTime($d['publish_at'], new DateTimeZone('UTC')) > $now) {
                                 $local = (new DateTime($d['publish_at'], new DateTimeZone('UTC')))

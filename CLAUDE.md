@@ -33,6 +33,15 @@ There is no persistent state between runs. The sequence in `seed.php` is:
 `001_description.sql`, `002_description.sql`, etc. The numeric prefix guarantees
 execution order.
 
+**SQLite `ALTER TABLE` limitation:** SQLite does not support `ADD COLUMN ... UNIQUE`.
+To add a unique column via migration, add the column without the constraint first,
+then enforce uniqueness with a separate `CREATE UNIQUE INDEX` statement:
+
+```sql
+ALTER TABLE documents ADD COLUMN readable_id TEXT;
+CREATE UNIQUE INDEX idx_documents_readable_id ON documents (readable_id);
+```
+
 Because the DB is recreated every run, there is no need for a `schema_migrations`
 tracking table. All migrations always run. This is intentional for the demo model.
 
@@ -124,7 +133,7 @@ tests/test.php        Test runner — add a test() block for every new feature
 | 0 | Migration system (runner in seed.php + migrations/ dir) | **Done** |
 | 1 | Share by name — title search on admin page | **Done** |
 | 2 | Scheduled publishing — publish_at timestamp + view gate | **Done** |
-| 3 | Human-readable document IDs — slug + random suffix | Pending |
+| 3 | Human-readable document IDs — slug + random suffix | **Done** |
 
 ---
 
