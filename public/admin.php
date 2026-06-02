@@ -10,20 +10,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
     $body = trim($_POST['body'] ?? '');
 
+    $publishAtInput = trim($_POST['publish_at'] ?? '');
+    $publishAt = null;
+
     if ($title === '' || $body === '') {
         $error = 'Title and body are required.';
     } else {
-        $stmt = db()->prepare('
-            INSERT INTO documents (title, body, created_by)
-            VALUES (?, ?, ?)
-        ');
-        $stmt->execute([$title, $body, $staff['id']]);
-        $docId = (int) db()->lastInsertId();
+        if ($publishAtInput !== '') {
+            try {
+                $dt = new DateTime($publishAtInput, new DateTimeZone('America/Chicago'));
+                $publishAt = $dt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+            } catch (Exception $e) {
+                $error = 'Invalid publish date.';
+            }
+        }
 
-        audit_log('create', 'document', $docId, ['title' => $title]);
+        if (!$error) {
+            $stmt = db()->prepare('
+                INSERT INTO documents (title, body, created_by, publish_at)
+                VALUES (?, ?, ?, ?)
+            ');
+            $stmt->execute([$title, $body, $staff['id'], $publishAt]);
+            $docId = (int) db()->lastInsertId();
 
-        header('Location: /admin.php?created=' . $docId);
-        exit;
+            audit_log('create', 'document', $docId, ['title' => $title, 'publish_at' => $publishAt]);
+
+            header('Location: /admin.php?created=' . $docId);
+            exit;
+        }
     }
 }
 
@@ -47,6 +61,7 @@ if ($q !== '') {
     ');
 }
 $docs = $stmt->fetchAll();
+$now = new DateTime('now', new DateTimeZone('UTC'));
 
 render_header('Admin', $staff);
 ?>
@@ -73,6 +88,10 @@ render_header('Admin', $staff);
             <label for="body">Body</label>
             <textarea id="body" name="body" required></textarea>
         </div>
+        <div class="form-field">
+            <label for="publish_at">Publish at <span class="label-hint">(leave blank to publish immediately)</span></label>
+            <input type="datetime-local" id="publish_at" name="publish_at">
+        </div>
         <button type="submit" class="btn">Create document</button>
     </form>
 </section>
@@ -94,6 +113,7 @@ render_header('Admin', $staff);
                     <th>Title</th>
                     <th>Creator</th>
                     <th>Created</th>
+                    <th>Status</th>
                     <th></th>
                 </tr>
             </thead>
@@ -104,6 +124,16 @@ render_header('Admin', $staff);
                         <td><?= h($d['title']) ?></td>
                         <td><?= h($d['creator_name']) ?></td>
                         <td><?= h($d['created_at']) ?></td>
+                        <td><?php
+                            if ($d['publish_at'] !== null && new DateTime($d['publish_at'], new DateTimeZone('UTC')) > $now) {
+                                $local = (new DateTime($d['publish_at'], new DateTimeZone('UTC')))
+                                    ->setTimezone(new DateTimeZone('America/Chicago'))
+                                    ->format('M j, g:i A');
+                                echo '<span class="status-scheduled">Scheduled · ' . h($local) . '</span>';
+                            } else {
+                                echo '<span class="text-muted">—</span>';
+                            }
+                        ?></td>
                         <td><a href="/share.php?doc=<?= (int) $d['id'] ?>" class="btn-link">Create share →</a></td>
                     </tr>
                 <?php endforeach ?>

@@ -20,6 +20,18 @@ if (!$doc) {
     exit;
 }
 
+$isScheduled = false;
+$scheduledFor = null;
+if ($doc['publish_at'] !== null) {
+    $now = new DateTime('now', new DateTimeZone('UTC'));
+    $publishAt = new DateTime($doc['publish_at'], new DateTimeZone('UTC'));
+    if ($now < $publishAt) {
+        $isScheduled = true;
+        $scheduledFor = $publishAt->setTimezone(new DateTimeZone('America/Chicago'))
+                                  ->format('M j, Y \a\t g:i A T');
+    }
+}
+
 $error = null;
 $created_token = null;
 
@@ -50,6 +62,12 @@ render_header('Share · ' . $doc['title'], $staff);
 
 <h1 class="page-title">Share "<?= h($doc['title']) ?>"</h1>
 <p class="page-subtitle">Generate a one-time link for a recipient.</p>
+
+<?php if ($isScheduled): ?>
+    <div class="banner banner-warn">
+        This document is scheduled to publish on <?= h($scheduledFor) ?>. Recipients will see a "not yet available" message until then.
+    </div>
+<?php endif ?>
 
 <?php if ($error): ?>
     <div class="banner banner-error"><?= h($error) ?></div>

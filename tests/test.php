@@ -66,5 +66,30 @@ test('title search is case-insensitive', function () {
     assert_true(count($rows) >= 1, 'expected case-insensitive match for lowercase "welcome"');
 });
 
+test('document with future publish_at is not yet available', function () {
+    $future = (new DateTime('+1 hour', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    db()->prepare('INSERT INTO documents (title, body, created_by, publish_at) VALUES (?,?,1,?)')
+        ->execute(['Future Doc', 'body', $future]);
+    $now = new DateTime('now', new DateTimeZone('UTC'));
+    $publishAt = new DateTime($future, new DateTimeZone('UTC'));
+    assert_true($now < $publishAt, 'future document should not be available yet');
+});
+
+test('document with past publish_at is available', function () {
+    $past = (new DateTime('-1 hour', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    db()->prepare('INSERT INTO documents (title, body, created_by, publish_at) VALUES (?,?,1,?)')
+        ->execute(['Past Doc', 'body', $past]);
+    $now = new DateTime('now', new DateTimeZone('UTC'));
+    $publishAt = new DateTime($past, new DateTimeZone('UTC'));
+    assert_true($now >= $publishAt, 'past-scheduled document should be available');
+});
+
+test('document with null publish_at is immediately available', function () {
+    $stmt = db()->prepare('SELECT publish_at FROM documents WHERE title = ?');
+    $stmt->execute(['Welcome Packet']);
+    $row = $stmt->fetch();
+    assert_true($row['publish_at'] === null, 'seeded document should have no publish_at restriction');
+});
+
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);
