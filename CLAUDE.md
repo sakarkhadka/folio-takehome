@@ -122,7 +122,7 @@ tests/test.php        Test runner — add a test() block for every new feature
 | Step | Feature | Status |
 |------|---------|--------|
 | 0 | Migration system (runner in seed.php + migrations/ dir) | **Done** |
-| 1 | Share by name — title search on admin page | Pending |
+| 1 | Share by name — title search on admin page | **Done** |
 | 2 | Scheduled publishing — publish_at timestamp + view gate | Pending |
 | 3 | Human-readable document IDs — slug + random suffix | Pending |
 

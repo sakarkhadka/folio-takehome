@@ -44,5 +44,27 @@ test('seeded share link resolves to the seeded document', function () {
     assert_true($row['title'] === 'Welcome Packet', 'unexpected title: ' . var_export($row['title'], true));
 });
 
+test('title search returns matching document', function () {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%Welcome%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) >= 1, 'expected at least one match for "Welcome"');
+    assert_true(stripos($rows[0]['title'], 'welcome') !== false, 'matched row title should contain search term');
+});
+
+test('title search returns nothing for unmatched term', function () {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%zzznomatch%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) === 0, 'expected no results for unmatched term');
+});
+
+test('title search is case-insensitive', function () {
+    $stmt = db()->prepare('SELECT * FROM documents WHERE title LIKE ?');
+    $stmt->execute(['%welcome%']);
+    $rows = $stmt->fetchAll();
+    assert_true(count($rows) >= 1, 'expected case-insensitive match for lowercase "welcome"');
+});
+
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);
